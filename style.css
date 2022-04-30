@@ -1,0 +1,40 @@
+/**
+ * @license
+ * Copyright 2019 Google LLC. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+}
+
+label, h3 {
+  display: block;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: large;
+  font-weight: bold;
+}
+
+input {
+  width: 80px;
+  height: 20px;
+  box-sizing: border-box;
+  font-size: small;
+}
+
+.location-div{
+  style={{
+    padding: "1rem",
+    flexBasis: "250px",
+    height: "100%",
+    overflow: "auto",
+  }}
+}
+
+button{
+  margin: 10px;
+}
