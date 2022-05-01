@@ -28,32 +28,32 @@ const render = (status: Status) => {
 const App: React.VFC = () => {
   const [clicks, setClicks] = React.useState<google.maps.LatLng[]>([]);
   const [loc, setLoc] = React.useState([]);
+  const [points,setPoints] = React.useState([]);
   const [zoom, setZoom] = React.useState(13); // initial zoom
   const [center, setCenter] = React.useState<google.maps.LatLngLiteral>({
     lat: 40.014984,
     lng: -105.270546,
   });
   const [maxlocation, setMaxLocation] = React.useState(5);
-  const [model, setModel] = React.useState("Model 1");
+  const [capacity, setCapacity] = React.useState(10);
+  const [model, setModel] = React.useState("vrp1");
   const [directions, setDirections] = React.useState(null);
 
-  const onClick = (e: google.maps.MapMouseEvent) => {
+  const onClick = async (e: google.maps.MapMouseEvent) => {
     // avoid directly mutating state
     if (loc.length < maxlocation) {
       let data = e.latLng!.toJSON();
       console.log(data);
       setClicks([...clicks, e.latLng!]);
 
-      axios.get('http://api.positionstack.com/v1/reverse', {
+      let response = await axios.get('http://api.positionstack.com/v1/reverse', {
         params: {
           access_key: import.meta.env.VITE_POSITION_STACK_API_KEY,
           query: `${data["lat"]},${data["lng"]}`
         }
       })
-        .then(function (response) {
-          console.log(response.data);
-          setLoc([...loc, response.data.data[0].name]);
-        })
+      console.log(response.data);
+      setLoc([...loc, response.data.data[0].name]);
     }
     else {
       alert("Maximum location limit exceeded");
@@ -68,45 +68,49 @@ const App: React.VFC = () => {
 
   const handleSubmit = () => {
     if (loc.length <= maxlocation) {
-      let demands: string[] = [];
-      for (let i = 0; i < maxlocation; i++) {
+      let demands: Number[] = [];
+      demands.push(0);
+      for (let i = 1; i < maxlocation; i++) {
         let x = (document.getElementById("demand" + i) as HTMLInputElement).value;
-        demands.push(x);
+        demands.push(Number(x));
       }
       console.log(demands);
+      
+      let locs = [];
+      let temp = [];
+      clicks.forEach(click => {
+        temp = click.toJSON();
+        locs.push([temp.lat,temp.lng])
+      })
+      console.log(locs);
+      console.log(capacity);
       console.log(model);
+      let data = {
+        locations : locs,
+        demands : demands,
+        capacity: Number(capacity)
+      }
+      console.log(data);
+      let url = new URL('http://10.0.0.54:5000/solve/'+model);
+      axios.post(url.toString(), data)
+      .then(function (response) {
+        console.log(response.data.routes);
+        if(response.data.status === "optimal")
+        {
+          setPoints(response.data.routes);
+        }
+      })
+      .catch(function (error) {
+        console.log(error);
+      });
     }
 
-    const waypoints = clicks.map(p => ({
-      location: p.toJSON(),
-      stopover: true
-    }));
-    const origin = waypoints.shift().location;
-    const destination = waypoints.pop().location;
-    console.log("waypoints", waypoints);
-    console.log("origin,", origin);
-    console.log("destination", destination);
-    const directionsService = new google.maps.DirectionsService();
-    directionsService.route(
-      {
-        origin: origin,
-        destination: destination,
-        travelMode: google.maps.TravelMode.DRIVING,
-        waypoints: waypoints
-      },
-      (result, status) => {
-        console.log(result)
-        if (status === google.maps.DirectionsStatus.OK) {
-          console.log("SUCCESS");
-          setDirections(result);
-        } else {
-          console.log("ERROR", result);
-        }
-      }
-    );
 
   }
 
+  const handleCapacity = (e) =>{
+    setCapacity(e.target.value);
+  }
   const handleMaximumLocation = (e) => {
     setMaxLocation(e.target.value);
   }
@@ -123,26 +127,22 @@ const App: React.VFC = () => {
       }}
     >
       <label htmlFor="maxLocation">Choose Number of Locations:</label>
+      <input id="maxLocation" type="number" onChange={handleMaximumLocation}/>
+      <p> Depot will be the first location and number of locations includes depot</p>
 
-      <select
-        name="maxLocation"
-        id="maxLocation"
-        onChange={handleMaximumLocation}>
-        <option value={5}>Five</option>
-        <option value={6}>Six</option>
-        <option value={7}>Seven</option>
-        <option value={8}>Eight</option>
-      </select>
 
+      <label htmlFor="model">Choose Capacity of vehicle:</label>
+      <input id="capacity" type="number" onChange={handleCapacity}/>
+     
       <label htmlFor="model">Choose Model:</label>
 
       <select
         name="model"
         id="model"
         onChange={handleModelChange}>
-        <option value={1}>Model 1</option>
-        <option value={2}>Model 2</option>
-        <option value={3}>Model 3</option>
+        <option value={"vrp1"}>vrp1</option>
+        <option value={"vrp2"}>Model 2</option>
+        <option value={"vrp3"}>Model 3</option>
       </select>
       <h3>{clicks.length === 0 ? "Click on map to add location" : "Locations Selected"}</h3>
 
@@ -165,6 +165,7 @@ const App: React.VFC = () => {
           onClick={onClick}
           onIdle={onIdle}
           zoom={zoom}
+          points= {points}
           directions={directions}
           style={{ flexGrow: "1", height: "100%" }}
         >
@@ -182,39 +183,106 @@ interface MapProps extends google.maps.MapOptions {
   style: { [key: string]: string };
   onClick?: (e: google.maps.MapMouseEvent) => void;
   onIdle?: (map: google.maps.Map) => void;
+  points;
 }
-function getRandomColor() {
-  var letters = '0123456789ABCDEF';
-  var color = '#';
-  for (var i = 0; i < 6; i++) {
-    color += letters[Math.floor(Math.random() * 16)];
+function getRandomColor(i) {
+  switch(i){
+    case 1: return 'black';
+    case 2: return 'red';
+    case 3: return 'blue';
+    case 4: return 'purple';
+    case 5: return 'brown';
+    case 6: return 'orange';
+    case 7: return 'mustard';
+    default: return 'aqua';
   }
-  return color;
 }
 const Map: React.FC<MapProps> = ({
   onClick,
   onIdle,
   children,
   style,
-  directions,
+  points,
   ...options
 }) => {
 
   const ref = React.useRef<HTMLDivElement>(null);
   const [map, setMap] = React.useState<google.maps.Map>();
   const directionsService = new google.maps.DirectionsService();
-  const directionsRenderer = new google.maps.DirectionsRenderer({
-    suppressBicyclingLayer: true,
-    suppressMarkers: true,
-    preserveViewport: true, // don't zoom to fit the route
-    polylineOptions: { strokeColor: getRandomColor() }
-  });
-  directionsRenderer.setMap(map);
   let bounds = new google.maps.LatLngBounds();
   let delay = 100;
-  directionsRenderer.setDirections(directions);
+  let nextAddress = 0;
+
+  function calcRoute(coordinates, next,i) {
+    const directionsRenderer = new google.maps.DirectionsRenderer({
+      suppressBicyclingLayer: true,
+      suppressMarkers: true,
+      preserveViewport: true, // don't zoom to fit the route
+      polylineOptions: { strokeColor: getRandomColor(i) }
+    });
+    let coordinatesJSON = []
+    coordinates.forEach(element => {
+      console.log(element)
+      coordinatesJSON.push({location:{lat: element[0],lng: element[1]},stopover:true})
+    });
+    console.log("coordinatesJSON",coordinatesJSON);
+    let start = coordinatesJSON.shift().location;
+    let end = coordinatesJSON.pop().location;
+    console.log("calcRoute('" + start + "','" + end + "',next)");
+  directionsService.route({
+        origin: start,
+        destination: end,
+        travelMode: google.maps.TravelMode.DRIVING,
+        waypoints: coordinatesJSON
+      },
+      function(result, status) {
+        if (status == 'OK') {
+          directionsRenderer.setMap(map);
+          directionsRenderer.setDirections(result);
+          bounds.union(result!.routes[0].bounds);
+          // if(map!= undefined){
+          // map.fitBounds(bounds);
+          // }
+        }
+        else {
+          console.log("status=" + status + " (start=" + start + ", end=" + end + ")");
+          if (status == google.maps.GeocoderStatus.OVER_QUERY_LIMIT) {
+            nextAddress--;
+            delay += 100;
+            console.log("delay between requests=" + delay);
+          } else {
+            var reason = "Code " + status;
+            var msg = 'start="' + start + ' end="' + end + '"" error=' + reason + '(delay=' + delay + 'ms)<br>';
+            console.log(msg);
+          }
+        }
+        next();
+      });
+  }
+
+  
 
 
+  function theNext() {
+      if (nextAddress < points.length) {
+        console.log("points",points[nextAddress]);
+        let temp = points[nextAddress]
+        console.log("temp",temp);
+        console.log('call calcRoute("' + temp + ') delay=' + delay);
+        setTimeout(()=>{
+            calcRoute(temp,theNext,nextAddress);
+        },delay);
+        nextAddress++;
+      } else {
+        if(map!= undefined){
+          map.fitBounds(bounds);
+          }
+      }
+  }
+  React.useEffect(() => {
+      console.log(points);
+      theNext();
+  }, [points]);
   React.useEffect(() => {
     if (ref.current && !map) {
       setMap(new window.google.maps.Map(ref.current, {}));
