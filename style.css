@@ -20,21 +20,43 @@ label, h3 {
 }
 
 input {
-  width: 80px;
+  width: 100px;
   height: 20px;
   box-sizing: border-box;
   font-size: small;
 }
-
-.location-div{
-  style={{
-    padding: "1rem",
-    flexBasis: "250px",
-    height: "100%",
-    overflow: "auto",
-  }}
+p{
+  width: 200px;
 }
+p+p {
+  margin-left: 50px;
+}
+select{
+  min-width: 120px;
+}
+.location-div{
 
+    /* padding: "1rem"; */
+    /* flex-basis: "250px"; */
+    /* overflow: "auto"; */
+    /* display:inline-block; */
+    /* flex-direction: column; */
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+   
+}
+.vehicle-container{
+  overflow: auto;
+  max-height: 200px;
+  height: 200px;
+}
+.location-container{
+  overflow: auto;
+  max-height: 100px;
+  height: 100px;
+}
 button{
   margin: 10px;
 }
